@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FinAnalyx · Financial health analysis</title>
+  <meta name="description" content="Live financial health analysis for any listed company: ratios, health score, trend insights and valuation, from SEC EDGAR and Yahoo Finance, or your own statements.">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/app.css">
+  <script>try{const t=localStorage.getItem('finanalyx-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#/" aria-label="Home">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--brand)"/><path d="M8 22l5-6 4 3 7-9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Fin<b>Analyx</b></span>
+    </a>
+    <div class="search" role="search">
+      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Search any company or ticker - Apple, RELIANCE.NS, TCS..." aria-label="Search companies" aria-controls="search-results" aria-expanded="false" role="combobox">
+      <kbd class="search-kbd">/</kbd>
+      <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="upload-open" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg><span>Upload</span>
+      </button>
+      <button class="btn btn-icon" id="theme-toggle" type="button" aria-label="Toggle dark mode">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4l1.4-1.4"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="app" class="container" tabindex="-1"></main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span>Data: <a href="https://www.sec.gov/edgar" target="_blank" rel="noopener">SEC EDGAR</a> (US filers, official 10-K XBRL) and Yahoo Finance (global). Quotes may be delayed.</span>
+    <span>For research and education only - not investment advice.</span>
+  </div>
+</footer>
+
+<div class="modal" id="upload-modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="upload-title">
+    <div class="modal-head">
+      <h2 id="upload-title">Analyze your own statements</h2>
+      <button class="btn btn-icon" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <p class="muted">Upload a Balance Sheet, P&amp;L and Cash Flow - as CSV, Excel or text-based PDF. Line items in the first column, one column per fiscal year. Up to 4&nbsp;MB.</p>
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="file-input" multiple accept=".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.pdf">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+      <strong>Drop files here or click to browse</strong>
+      <span class="muted">CSV · XLSX · XLS · PDF</span>
+    </label>
+    <ul class="file-list" id="file-list"></ul>
+    <div class="form-row">
+      <label>Company name <input type="text" id="upload-company" placeholder="Optional"></label>
+      <label>Balance basis
+        <select id="upload-basis"><option value="average">Average (opening + closing)</option><option value="ending">Year-end</option></select>
+      </label>
+    </div>
+    <div class="modal-foot">
+      <span class="muted small">Try a sample: <a href="#" data-sample="northwind">Northwind (CSV)</a> · <a href="#" data-sample="meridian">Meridian Retail (Excel)</a></span>
+      <button class="btn btn-primary" id="upload-go" type="button" disabled>Analyze</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="metric-modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="metric-title">
+    <div class="modal-head">
+      <div><h2 id="metric-title"></h2><div class="muted small" id="metric-formula"></div></div>
+      <button class="btn btn-icon" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <p id="metric-desc"></p>
+    <div class="chart-box tall"><canvas id="metric-chart"></canvas></div>
+    <div id="metric-notes"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

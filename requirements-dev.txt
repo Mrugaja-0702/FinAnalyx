@@ -1,0 +1,4 @@
+-r requirements.txt
+uvicorn>=0.29
+pytest>=7
+matplotlib>=3.7   # only used to generate a PDF in tests

@@ -1,0 +1,23 @@
+Northwind Industries - Balance Sheet,,,,,
+USD in millions,,,,,
+Line item,FY2021,FY2022,FY2023,FY2024,FY2025
+Assets,,,,,
+Cash and cash equivalents,120,150,140,130,95
+"Accounts receivable, net",140,160,182,240,310
+Inventories,110,125,140,165,200
+Other current assets,30,32,35,38,40
+Total current assets,400,467,497,573,645
+"Property, plant & equipment, net",500,520,700,760,800
+Other non-current assets,100,105,110,115,120
+Total assets,1000,1092,1307,1448,1565
+Liabilities,,,,,
+Accounts payable,90,100,112,130,150
+Short-term debt,40,35,60,80,120
+Other current liabilities,60,64,70,80,90
+Total current liabilities,190,199,242,290,360
+Long-term debt,160,140,300,340,360
+Other non-current liabilities,50,52,55,58,60
+Total liabilities,400,391,597,688,780
+Shareholders' equity,,,,,
+Total shareholders' equity,600,701,710,760,785
+Total liabilities & shareholders' equity,1000,1092,1307,1448,1565
