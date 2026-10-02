@@ -29,6 +29,47 @@ Each company page has:
 - **Notes:** warnings, assumptions, formulas, and a source-to-line-item mapping audit.
 - **Export:** Excel, HTML report, JSON, CSV, a share link (the URL encodes the company, years, source, basis and tab), and print to PDF.
 
+### Equity research: what makes a stock rise or fall
+
+These tabs are built for finance students. Each one answers one question about the share price and explains the finance behind the answer.
+
+- **Stock drivers:** eight factors, each scored −2 (headwind) to +2 (tailwind) from explicit, inspectable rules:
+  - growth
+  - profitability
+  - earnings quality
+  - financial strength
+  - valuation
+  - price momentum
+  - market risk
+  - capital allocation
+
+  Every factor lists the evidence behind its score, explains *why it moves share prices*, and says what to watch. The factors combine into an overall tilt, a **bull case vs bear case**, and a watch list.
+- **Sensitivities: what moves the price.** These estimate how much EPS or value changes for:
+  - +1 point of net margin
+  - a 5% revenue beat or miss, amplified by the company's measured operating leverage
+  - +1 point on the cost of debt
+  - +1 turn of P/E
+  - +1 point of WACC
+  - a 10% market fall, scaled by beta
+- **Price attribution:** splits the share-price change between fiscal year-ends into **EPS growth vs P/E re-rating**, using ln(P₁/P₀) = ln(EPS₁/EPS₀) + ln(PE₁/PE₀). Stock splits are detected and share counts restated.
+- **Valuation lab:**
+  - an interactive two-stage **DCF** on FCFF, with sliders for growth, terminal growth, risk-free rate, beta and equity risk premium
+  - a **WACC build-up** via CAPM, using the stock's measured beta and the live 10-year Treasury yield for USD
+  - a WACC × terminal-growth **sensitivity grid**
+  - a **reverse DCF**, i.e. the growth the market is pricing in
+  - **bull / base / bear price targets** (revenue × margin × P/E), with editable assumptions and a probability-weighted target
+- **Price & risk:**
+  - price with 50- and 200-day moving averages, golden or death cross, relative performance vs the local index (S&P 500, NIFTY 50, FTSE 100…), and an underwater drawdown chart
+  - returns vs the benchmark over 1M–5Y
+  - beta, correlation / R², volatility, Sharpe, Sortino, max drawdown, RSI(14) and 12-1 momentum
+- **Scorecards:** **Piotroski F-Score** (9 signals), **Altman Z-Score** (original, using market value) and **Z''-Score** (using book equity), and the **Beneish M-Score** (8 indices, with flags). Every component is shown with its explanation.
+
+**Mixed currencies:** if a share trades in a different currency from its accounts (e.g. Infosys: NSE price in INR, accounts in USD, or London prices in pence), prices are converted at the prevailing exchange rate before any multiple is computed.
+
+**Uploaded statements:** these get the fundamental factors, the scorecards and a DCF. Enter shares and price to get per-share values.
+
+This is a rules-based reading of reported data for learning purposes, not investment advice.
+
 ### Run locally
 
 ```bash
@@ -179,10 +220,15 @@ These run whenever there are at least 2 years of data. Detectors that look for m
 
 ```
 api/index.py      FastAPI app (Vercel serverless function; also serves public/ locally)
-public/           web UI: index.html, assets/app.js, assets/app.css, samples/
+public/           web UI: index.html, assets/app.js + research.js (panels), app.css + research.css, samples/
 vercel.json       routing, function limits, security headers
 finanalyx/
   providers/      live data: sec.py (SEC EDGAR XBRL), yahoo.py (Yahoo Finance), base.py (HTTP, cache)
+  research.py     orchestrates market data, scorecards, valuation and drivers (with FX conversion)
+  drivers.py      8-factor stock-driver scorecard, bull/bear case, watch list
+  valuation.py    WACC (CAPM), two-stage DCF, reverse DCF, scenarios, EPS-vs-P/E attribution, sensitivities
+  market.py       returns, beta, volatility, Sharpe/Sortino, drawdown, moving averages, RSI
+  scores.py       Piotroski F-Score, Altman Z / Z'', Beneish M-Score
   ingest.py       file reading, header/period/number parsing, units, statement detection
   schema.py       canonical line items + synonyms
   mapping.py      label -> line-item matching (exact, override, guarded fuzzy)

@@ -297,7 +297,9 @@ async function loadCompany(symbol) {
 // ------------------------------------------------------------- analysis view
 function renderAnalysis() {
   destroyCharts();
+  if (state._valFor !== state.data) { state.val = null; state._valFor = state.data; }
   const d = state.data, info = d.company_info || {};
+  if (state.tab === 'market' && !d.market) state.tab = 'overview';
   document.title = `${d.company} - Financial Health`;
   const years = d.years;
   const span = years.length > 1 ? `${fy(years[0])}-${fy(years[years.length - 1])}` : fy(years[0]);
@@ -355,7 +357,9 @@ function renderAnalysis() {
   </div>
 
   <div class="tabs" role="tablist">
-    ${[['overview', 'Overview'], ['ratios', 'Ratios'], ['insights', `Insights <span class="count">${insightsN}</span>`],
+    ${[['overview', 'Overview'], ['drivers', 'Stock drivers'], ['valuation', 'Valuation'],
+       ...(d.market ? [['market', 'Price &amp; risk']] : []), ['scores', 'Scorecards'], ['ratios', 'Ratios'],
+       ['insights', `Insights <span class="count">${insightsN}</span>`],
        ['financials', 'Financials'], ['notes', `Notes &amp; methodology${d.warnings.length ? ` <span class="count">${d.warnings.length}</span>` : ''}`]]
       .map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`).join('')}
   </div>
@@ -392,7 +396,8 @@ function setTab(tab) {
 function renderPanel() {
   destroyCharts();
   const p = $('#panel');
-  ({ overview: panelOverview, ratios: panelRatios, insights: panelInsights, financials: panelFinancials, notes: panelNotes }[state.tab]
+  ({ overview: panelOverview, drivers: panelDrivers, valuation: panelValuation, market: panelMarket, scores: panelScores,
+     ratios: panelRatios, insights: panelInsights, financials: panelFinancials, notes: panelNotes }[state.tab]
     || panelOverview)(p);
 }
 
@@ -499,19 +504,26 @@ function valuationCells(q) {
     try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: qCur, notation: 'compact', maximumFractionDigits: 2 }).format(mcap); }
     catch { return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 2 }).format(mcap); }
   })();
+  const fx = d.valuation_model?.fx;
+  let px = price, mcapFin = mcap;
   if (finCur && qCur && finCur !== qCur) {
-    return cell('Market cap', mcapTxt) + cell('Multiples', `<span class="muted small">Financials in ${esc(finCur)}, quote in ${esc(qCur)}</span>`);
+    if (!(fx && fx.quote?.toUpperCase() === qCur && fx.rate)) {
+      return cell('Market cap', mcapTxt) + cell('Multiples', `<span class="muted small">Financials in ${esc(finCur)}, quote in ${esc(qCur)}</span>`);
+    }
+    px = price / fx.rate;  // convert the live price into the reporting currency
+    mcapFin = px * shares;
   }
   const v = (k) => vi[k]?.value;
   const mult = (num, den, label) => den == null || num == null ? 'n/a' : den <= 0 ? 'n/m' : (num / den).toFixed(1) + 'x';
-  const ev = mcap + (v('total_debt_used') || 0) - (v('cash') || 0) - (v('short_term_investments') || 0);
-  const fcfYield = v('free_cash_flow') != null ? (v('free_cash_flow') / mcap * 100).toFixed(1) + '%' : 'n/a';
+  const ev = mcapFin + (v('total_debt_used') || 0) - (v('cash') || 0) - (v('short_term_investments') || 0);
+  const fcfYield = v('free_cash_flow') != null ? (v('free_cash_flow') / mcapFin * 100).toFixed(1) + '%' : 'n/a';
+  const fxNote = mcapFin !== mcap ? ` (price converted at ${fx.rate.toFixed(2)} ${qCur}/${finCur})` : '';
   const yr = (k) => vi[k]?.year ? ` (${fy(vi[k].year)})` : '';
   return cell('Market cap', mcapTxt, 'Live price x shares outstanding')
-    + cell('P/E', mult(mcap, v('net_income')), 'Market cap / net income' + yr('net_income'))
-    + cell('P/B', mult(mcap, v('total_equity')), 'Market cap / shareholders\' equity' + yr('total_equity'))
-    + cell('EV/EBITDA', mult(ev, v('ebitda')), 'Enterprise value / EBITDA' + yr('ebitda'))
-    + cell('P/S', mult(mcap, v('revenue')), 'Market cap / revenue' + yr('revenue'))
+    + cell('P/E', mult(mcapFin, v('net_income')), 'Market cap / net income' + yr('net_income') + fxNote)
+    + cell('P/B', mult(mcapFin, v('total_equity')), 'Market cap / shareholders\' equity' + yr('total_equity') + fxNote)
+    + cell('EV/EBITDA', mult(ev, v('ebitda')), 'Enterprise value / EBITDA' + yr('ebitda') + fxNote)
+    + cell('P/S', mult(mcapFin, v('revenue')), 'Market cap / revenue' + yr('revenue') + fxNote)
     + cell('FCF yield', fcfYield, 'Free cash flow / market cap' + yr('free_cash_flow'));
 }
 
@@ -546,6 +558,7 @@ function panelOverview(p) {
   const live = state.kind === 'company';
   p.innerHTML = `
     ${live ? `<div class="card card-pad section"><div class="card-title">Executive summary</div>${summaryList(d)}</div>` : ''}
+    ${driversSnapshot(d)}
     <h2 class="section-title">Key metrics <span class="muted small" style="font-weight:400">Latest fiscal year · click any metric for history</span></h2>
     <div class="tiles">${d.headline.map(tileHTML).join('')}</div>
     <h2 class="section-title">Trends</h2>
@@ -562,6 +575,7 @@ function panelOverview(p) {
     t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(t.dataset.key); } });
   });
   $('#see-all').addEventListener('click', (e) => { e.preventDefault(); setTab('insights'); });
+  $$('[data-goto]', p).forEach((b) => b.addEventListener('click', () => { setTab(b.dataset.goto); window.scrollTo({ top: $('.tabs').offsetTop - 70, behavior: 'smooth' }); }));
   drawOverviewCharts();
 }
 
@@ -786,6 +800,7 @@ function panelNotes(p) {
     <td>${m.good == null ? '<span class="muted">context</span>' : (m.higher_is_better ? '&ge; ' : '&le; ') + fmtMetric(m, m.good) + ' / ' + (m.higher_is_better ? '&lt; ' : '&gt; ') + fmtMetric(m, m.weak)}</td></tr>`).join('');
   p.innerHTML = `
     <div class="section" style="display:grid;gap:12px">
+      ${(d.research_notes || []).length ? `<div class="card card-pad"><div class="card-title">Market data notes</div><ul class="notes-list">${d.research_notes.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
       ${d.warnings.length ? `<div class="card card-pad"><div class="card-title">Data quality warnings</div><ul class="notes-list">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
       <div class="card card-pad"><div class="card-title">Assumptions applied</div>
         ${d.assumptions.length ? `<ul class="notes-list">${d.assumptions.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : '<p class="muted" style="margin:0">No special assumptions were needed for this data set.</p>'}

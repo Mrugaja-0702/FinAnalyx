@@ -36,9 +36,23 @@ def fake_company(symbol="ACME", source="auto", years=5):
                        exchange="NYSE", sector="Industrials")
 
 
+def fake_history(symbol, range_="5y", interval="1d"):
+    """Two years of synthetic daily prices: a steady uptrend with a weekly wiggle."""
+    import math
+    start, day = 1_700_000_000, 86_400
+    drift = 0.0006 if symbol == "ACME" else 0.0004
+    out = []
+    for i in range(520):
+        p = 100 * math.exp(drift * i) * (1 + 0.02 * math.sin(i / 3))
+        out.append((start + i * day, p, p))
+    return out
+
+
 @pytest.fixture(autouse=True)
 def stub_providers(monkeypatch):
     monkeypatch.setattr(providers, "fetch_company", fake_company)
+    monkeypatch.setattr(providers.yahoo, "history", fake_history)
+    monkeypatch.setattr(providers.yahoo, "risk_free_rate", lambda cur: (0.04, "test"))
     monkeypatch.setattr(providers, "search", lambda q, limit=8: [{"symbol": "ACME", "name": "Acme Corp",
                                                                   "exchange": "NYSE"}])
 
@@ -62,6 +76,22 @@ def test_company_json_contract():
     assert set(d["headline"]) <= set(d["ratios"])
     # the mapping audit shows the provider's own concept names
     assert any(m["raw_label"] == "stub:revenue" for m in d["mapping"])
+    # research layer
+    assert d["market"]["benchmark"] == "S&P 500" and d["market"]["beta"]["beta"] > 0
+    assert len(d["price_series"]["close"]) > 400
+    vm = d["valuation_model"]
+    assert vm["wacc"]["wacc"] > 0 and vm["dcf"]["per_share"] > 0
+    assert {f["key"] for f in d["drivers"]["factors"]} >= {"growth", "valuation", "momentum", "risk"}
+    assert d["drivers"]["label"]
+    assert d["scores"]["piotroski"]["score"] >= 0
+
+
+def test_upload_has_fundamental_research_only():
+    files = [("files", (p.name, p.read_bytes())) for p in sorted((ROOT / "public" / "samples").glob("northwind_*.csv"))]
+    d = client.post("/api/analyze", files=files).json()
+    assert d["market"] is None and d["valuation_model"]["price"] is None
+    names = {f["key"]: f for f in d["drivers"]["factors"]}
+    assert names["valuation"]["available"] is False and names["growth"]["available"] is True
 
 
 def test_company_exports():

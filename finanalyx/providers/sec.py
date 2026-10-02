@@ -26,6 +26,8 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
                       "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic"),
     "tax_expense": ("IncomeTaxExpenseBenefit",),
     "net_income": ("NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic", "ProfitLoss"),
+    "shares_outstanding": ("WeightedAverageNumberOfDilutedSharesOutstanding",
+                           "WeightedAverageNumberOfSharesOutstandingBasicAndDiluted"),
     "cash": ("CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
              "Cash"),
     "short_term_investments": ("ShortTermInvestments", "MarketableSecuritiesCurrent",
@@ -45,6 +47,7 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
     "total_equity": ("StockholdersEquity",
                      "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"),
     "minority_interest": ("MinorityInterest",),
+    "retained_earnings": ("RetainedEarningsAccumulatedDeficit",),
     "total_liabilities_and_equity": ("LiabilitiesAndStockholdersEquity",),
     "operating_cash_flow": ("NetCashProvidedByUsedInOperatingActivities",
                             "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"),
@@ -58,7 +61,8 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
 # Flows are measured over a fiscal year; the rest are point-in-time balances.
 FLOW_ITEMS = {"revenue", "cogs", "gross_profit", "operating_expenses", "depreciation_amortization", "ebit",
               "interest_expense", "pretax_income", "tax_expense", "net_income", "operating_cash_flow", "capex",
-              "investing_cash_flow", "financing_cash_flow", "dividends_paid"}
+              "investing_cash_flow", "financing_cash_flow", "dividends_paid", "shares_outstanding"}
+SHARE_ITEMS = {"shares_outstanding"}
 
 _tickers_cache = TTLCache(ttl=86400, max_items=2)
 _facts_cache = TTLCache(ttl=3600, max_items=64)
@@ -116,9 +120,9 @@ def fetch_company(symbol: str, years: int = 10) -> CompanyData:
         raise ProviderError(f"{info['name']} does not file US-GAAP financials with the SEC "
                             "(foreign filers report under IFRS).", 422)
 
-    def usd_units(concept: str) -> dict:
+    def usd_units(concept: str, unit: str = "USD") -> dict:
         units = (gaap.get(concept) or {}).get("units") or {}
-        return {"USD": units["USD"]} if "USD" in units else {}
+        return {unit: units[unit]} if unit in units else {}
 
     # Fiscal year-ends are the end dates of annual net income / revenue periods.
     fy_ends: set[dt.date] = set()
@@ -139,7 +143,8 @@ def fetch_company(symbol: str, years: int = 10) -> CompanyData:
         merged: dict[int, float] = {}
         used = []
         for concept in concepts:
-            for end, (val, _) in sorted(_annual_points(usd_units(concept), key in FLOW_ITEMS).items()):
+            unit = "shares" if key in SHARE_ITEMS else "USD"
+            for end, (val, _) in sorted(_annual_points(usd_units(concept, unit), key in FLOW_ITEMS).items()):
                 year = fiscal_year(end)
                 if year is None or year in merged:
                     continue
@@ -160,10 +165,11 @@ def fetch_company(symbol: str, years: int = 10) -> CompanyData:
         latest_end = max(p["end"] for p in pts)
         shares = float(sum(p["val"] for p in pts if p["end"] == latest_end))  # sums share classes
     tables, overrides = build_tables(SOURCE, values, labels, "USD")
+    period_ends = {fe.year: fe.isoformat() for fe in sorted(fy_ends) if fe.year in keep}
     return CompanyData(
         symbol=symbol.upper(), name=facts.get("entityName") or info["name"], source=SOURCE,
         source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik:010d}&type=10-K",
-        currency="USD", tables=tables, overrides=overrides, shares_outstanding=shares,
+        currency="USD", tables=tables, overrides=overrides, shares_outstanding=shares, period_ends=period_ends,
     )
 
 

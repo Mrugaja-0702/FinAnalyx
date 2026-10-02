@@ -67,6 +67,7 @@ def northwind() -> None:
         ("Selling, general & administrative", sga), ("Depreciation & amortization", da),
         ("Operating income", ebit), ("Interest expense", interest), ("Income before taxes", pbt),
         ("Income tax expense", tax), ("Net income", ni),
+        ("Diluted shares outstanding", [100, 99, 97, 96, 95]),
     ])
     write("northwind_balance_sheet.csv", "Northwind Industries - Balance Sheet", [
         ("Assets", None), ("Cash and cash equivalents", cash), ("Accounts receivable, net", ar),
@@ -75,7 +76,8 @@ def northwind() -> None:
         ("Liabilities", None), ("Accounts payable", ap), ("Short-term debt", std),
         ("Other current liabilities", ocl), ("Total current liabilities", tcl), ("Long-term debt", ltd),
         ("Other non-current liabilities", oncl), ("Total liabilities", tl),
-        ("Shareholders' equity", None), ("Total shareholders' equity", te),
+        ("Shareholders' equity", None), ("Common stock", [200] * 5), ("Retained earnings", [e - 200 for e in te]),
+        ("Total shareholders' equity", te),
         ("Total liabilities & shareholders' equity", ta),
     ])
     inv_cf = [-c for c in capex]

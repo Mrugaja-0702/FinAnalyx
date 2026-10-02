@@ -32,6 +32,7 @@ from finanalyx.export import clean, to_dict, to_excel  # noqa: E402
 from finanalyx.ingest import SUPPORTED_EXTENSIONS, IngestError  # noqa: E402
 from finanalyx.providers import ProviderError  # noqa: E402
 from finanalyx.report_html import render_html  # noqa: E402
+from finanalyx.research import research  # noqa: E402
 
 log = logging.getLogger("finanalyx.api")
 
@@ -156,9 +157,16 @@ def company(symbol: str, source: str = Query("auto"), years: int = Query(5, ge=2
             "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         },
         "valuation_inputs": _valuation_inputs(a),
+        "period_ends": {str(y): d for y, d in data.period_ends.items()},
     }
+    if format == "json":
+        extra.update(research(
+            a, symbol=data.symbol, currency=data.currency, shares_now=data.shares_outstanding,
+            period_ends=data.period_ends, history=providers.yahoo.history,
+            benchmark=providers.yahoo.benchmark_for(data.symbol), rf=providers.yahoo.risk_free_rate(data.currency),
+            price_currency=providers.yahoo.price_currency, fx_history=providers.yahoo.fx_history))
     return _respond(a, format, _slug(f"{data.symbol}_analysis"), extra,
-                    "public, s-maxage=1800, stale-while-revalidate=86400")
+                    "public, s-maxage=900, stale-while-revalidate=86400")
 
 
 @app.post("/api/analyze")
@@ -188,6 +196,8 @@ async def analyze_upload(files: list[UploadFile] = File(...), company: str = For
                                   "files": [Path(f.filename or "").name for f in files],
                                   "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat()},
                  "valuation_inputs": None}
+        if format == "json":
+            extra.update(research(a))
         return _respond(a, format, _slug(f"{a.data.company}_analysis"), extra, "no-store")
 
 

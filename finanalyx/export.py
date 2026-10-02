@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .analyzer import Analysis, health_scores
+from .scores import compute_scores
 from .model import EXTRA_LABELS, fy, item_label
 from .ratios import HEADLINE, METRIC_INDEX, METRICS, fmt_value
 from .schema import ITEMS
@@ -26,6 +27,7 @@ def to_dict(a: Analysis) -> dict:
         "balance_basis": rr.basis,
         "year_labels": {str(y): fy(y) for y in fd.years},
         "health_score": health_scores(a),
+        "scores": compute_scores(a.data),
         "line_items": {k: {"label": item_label(k),
                            "statement": ITEMS[k].statement if k in ITEMS else "derived",
                            "order": _ITEM_ORDER.get(k, 999),

@@ -41,6 +41,7 @@ class CompanyData:
     sector: str | None = None
     industry: str | None = None
     notes: list[str] = field(default_factory=list)
+    period_ends: dict[int, str] = field(default_factory=dict)  # fiscal year -> ISO period-end date
 
 
 class TTLCache:

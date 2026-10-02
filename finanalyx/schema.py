@@ -85,6 +85,12 @@ LINE_ITEMS: tuple[LineItem, ...] = (
         "net income attributable to common shareholders", "profit attributable to owners",
         "net income attributable to parent",
     )),
+    LineItem("shares_outstanding", "Diluted Shares Outstanding", IS, (
+        "weighted average shares diluted", "weighted average diluted shares outstanding",
+        "diluted weighted average shares", "diluted shares outstanding", "diluted shares",
+        "weighted average number of shares diluted", "weighted average shares outstanding",
+        "weighted average number of shares", "shares outstanding", "number of shares outstanding",
+    )),
     # ------------------------------------------------------- Balance sheet
     LineItem("cash", "Cash & Equivalents", BS, (
         "cash and cash equivalents", "cash and equivalents", "cash", "cash and bank balances",
@@ -139,6 +145,10 @@ LINE_ITEMS: tuple[LineItem, ...] = (
         "total shareholders funds", "shareholders equity", "stockholders equity",
         "shareholders funds", "total equity attributable to shareholders",
         "equity attributable to owners", "net worth", "networth", "equity",
+    )),
+    LineItem("retained_earnings", "Retained Earnings", BS, (
+        "retained earnings", "retained earnings accumulated deficit", "accumulated deficit",
+        "retained profits", "accumulated earnings",
     )),
     LineItem("minority_interest", "Non-controlling Interest", BS, (
         "non controlling interests", "non controlling interest", "noncontrolling interests",

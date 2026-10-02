@@ -79,6 +79,31 @@ def ratio_table_lines(a: Analysis) -> list[str]:
     return out
 
 
+def scorecard_lines(a: Analysis) -> list[str]:
+    from .scores import compute_scores
+
+    sc = compute_scores(a.data)
+    out = ["", _rule("="), " SCORECARDS (academic models)", _rule("=")]
+    pio, alt, ben = sc.get("piotroski"), sc.get("altman"), sc.get("beneish")
+    if pio:
+        out.append(f" Piotroski F-Score ({fy(pio['year'])})   {pio['score']}/{pio['max']}   {pio['verdict']}")
+        for s in pio["signals"]:
+            mark = "n/a" if s["pass"] is None else ("PASS" if s["pass"] else "fail")
+            out.append(f"   [{mark:>4}] {s['name']}")
+    else:
+        out.append(" Piotroski F-Score   n/a (needs two consecutive years)")
+    if alt and alt.get("models"):
+        for mdl in alt["models"]:
+            out.append(f" Altman {mdl['name']:<32} {mdl['value']:6.2f}   {mdl['zone'].upper()} zone   ({mdl['thresholds']})")
+    else:
+        out.append(" Altman Z-Score   n/a" + (f" - {alt['note']}" if alt and alt.get("note") else ""))
+    if ben:
+        out.append(f" Beneish M-Score ({fy(ben['year'])})     {ben['value']:6.2f}   " + _wrap(ben["verdict"], "     ").strip())
+    else:
+        out.append(" Beneish M-Score   n/a (needs two consecutive years)")
+    return out
+
+
 def calculation_notes(a: Analysis) -> list[str]:
     """Per-year metric notes grouped as '<note> (FY21): ROE, ROA, ...'."""
     grouped: dict[tuple[str, int], list[str]] = {}
@@ -120,6 +145,8 @@ def render_text(a: Analysis, verbose: bool = False, max_insights: int = 10) -> s
     if not verbose and len(tr.insights) > max_insights:
         out.append(f"   ... {len(tr.insights) - max_insights} more (use --verbose or see the HTML report)")
     out.append("   Legend: [!!] concern  [!] watch  [+] positive  [ ] neutral")
+
+    out += scorecard_lines(a)
 
     out += ["", _rule("="), " RATIO ANALYSIS", _rule("=")]
     out += ratio_table_lines(a)
