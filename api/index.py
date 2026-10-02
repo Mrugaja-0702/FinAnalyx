@@ -18,13 +18,17 @@ import re
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode
+from urllib.parse import quote as url_quote
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from fastapi import FastAPI, File, Form, Query, Request, UploadFile  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.responses import HTMLResponse, JSONResponse, Response  # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 from finanalyx import __version__, providers  # noqa: E402
 from finanalyx.analyzer import Analysis, analyze, analyze_tables  # noqa: E402
@@ -44,10 +48,47 @@ app = FastAPI(title="FinAnalyx API", version=__version__,
               docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
 
 
+class RestoreRewrittenPath:
+    """Undo Vercel's rewrite so FastAPI routes on the URL the browser requested.
+
+    vercel.json rewrites /api/<rest> to /api/index?__path=<rest>; the function would otherwise
+    see "/api/index" for every request. Requests without __path (local runs) pass through untouched.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and b"__path=" in scope.get("query_string", b""):
+            params = parse_qsl(scope["query_string"].decode("latin-1"), keep_blank_values=True)
+            original = next((v for k, v in params if k == "__path"), "")
+            rest = [(k, v) for k, v in params if k != "__path"]
+            path = "/api/" + original.lstrip("/")
+            scope = dict(scope, path=path, raw_path=url_quote(path).encode(),
+                         query_string=urlencode(rest).encode("latin-1"))
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(RestoreRewrittenPath)
+
+
 # ------------------------------------------------------------------ errors
 
 def _error(message: str, status: int) -> JSONResponse:
     return JSONResponse({"error": message}, status_code=status, headers={"Cache-Control": "no-store"})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_error(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return _error(f"No API route for '{request.url.path}'.", 404)
+    return _error(str(exc.detail), exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(_: Request, exc: RequestValidationError):
+    problems = "; ".join(f"{'.'.join(str(x) for x in e.get('loc', [])[1:])}: {e.get('msg')}" for e in exc.errors())
+    return _error(f"Invalid request - {problems}", 422)
 
 
 @app.exception_handler(ProviderError)

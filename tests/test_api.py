@@ -94,6 +94,22 @@ def test_upload_has_fundamental_research_only():
     assert names["valuation"]["available"] is False and names["growth"]["available"] is True
 
 
+def test_vercel_rewritten_paths_are_restored():
+    # vercel.json rewrites /api/<rest>?<query> to /api/index?__path=<rest>&<query>
+    r = client.get("/api/index", params={"__path": "company/ACME", "basis": "ending"})
+    assert r.status_code == 200, r.text
+    assert r.json()["balance_basis"] == "ending"  # original query string is preserved
+    assert client.get("/api/index", params={"__path": "health"}).json()["status"] == "ok"
+    assert client.get("/api/index", params={"__path": "search", "q": "acme"}).json()["results"]
+    r = client.get("/api/index", params={"__path": "nope"})
+    assert r.status_code == 404 and "No API route for '/api/nope'" in r.json()["error"]
+
+
+def test_validation_errors_are_readable():
+    r = client.get("/api/company/ACME", params={"years": 99})
+    assert r.status_code == 422 and r.json()["error"].startswith("Invalid request - years")
+
+
 def test_company_exports():
     r = client.get("/api/company/ACME", params={"format": "xlsx"})
     assert r.status_code == 200 and r.content[:2] == b"PK"

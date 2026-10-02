@@ -101,7 +101,7 @@ async function getJSON(url, opts) {
   const r = await fetch(url, opts);
   let body = null;
   try { body = await r.json(); } catch { /* non-JSON */ }
-  if (!r.ok) throw new Error(body?.error || `Request failed (HTTP ${r.status}).`);
+  if (!r.ok) throw new Error(body?.error || (typeof body?.detail === 'string' ? body.detail : '') || `Request failed (HTTP ${r.status}).`);
   return body;
 }
 const api = {
